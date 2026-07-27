@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# AWS CDK
+.cdk.staging/
+cdk.out/
+
+# Node / IDEs
+.vscode/
+.idea/
+*.DS_Store
