@@ -1,14 +1,22 @@
-# Python
+# Python virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python bytecode and cache
 __pycache__/
 *.py[cod]
-venv/
-.venv/
 
-# AWS CDK
-.cdk.staging/
+# CDK build output and assets
 cdk.out/
+.cdk.staging/
 
-# Node / IDEs
-.vscode/
-.idea/
-*.DS_Store
+# Local configuration & secrets
+outputs.json
+*.env
+.env.*
+
+# OS generated files
+.DS_Store
+Thumbs.db
