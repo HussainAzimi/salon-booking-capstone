@@ -43,3 +43,13 @@ jobs:
         run: |
           cdk synth
           cdk deploy --require-approval never
+
+      - name: Deploy Frontend to S3
+        run: |
+          BUCKET_NAME=$(jq -r '.. | .SalonFrontendBucketName? // empty' outputs.json | head -n 1)
+          if [ -n "$BUCKET_NAME" ]; then
+            aws s3 sync ./frontend s3://$BUCKET_NAME/ --delete
+            echo "Successfully deployed frontend to s3://$BUCKET_NAME/"
+          else
+            echo "S3 Bucket output not found in outputs.json. Skipping frontend sync."
+          fi
