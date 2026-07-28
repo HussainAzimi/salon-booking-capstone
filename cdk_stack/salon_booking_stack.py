@@ -9,7 +9,8 @@ from aws_cdk import (
     aws_sqs as sqs,
     aws_lambda as _lambda,
     aws_lambda_event_sources as lambda_events,
-    CfnOutput
+    CfnOutput,
+    os
 )
 from constructs import Construct
 
@@ -88,7 +89,8 @@ class SalonBookingStack(Stack):
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             environment={
-                "QUEUE_URL": booking_queue.queue_url
+                "QUEUE_URL": booking_queue.queue_url,
+                "STRIPE_SECRET_KEY": os.environ.get("STRIPE_SECRET_KEY", "")
             }
         )
         # IAM Scope: Grant SendMessage permissions to SQS
