@@ -75,8 +75,8 @@ class SalonBookingStack(Stack):
                 ignore_public_acls=False,
                 restrict_public_buckets=False
             ),
-            removal_policy=RemovalPolicy.DESTROY
-            auto_dlete_objects=True
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True
         )
 
         # 6. Booking Lambda Function (Private Subnet)
