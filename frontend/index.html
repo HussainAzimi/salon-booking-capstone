@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salon Appointment Booking</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f4f6f9; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
+        h1 { margin-top: 0; color: #333; text-align: center; }
+        
+        /* Banner Styles */
+        .alert { padding: 15px; margin-bottom: 20px; border-radius: 6px; display: none; text-align: center; font-weight: bold; }
+        .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        
+        .form-group { margin-bottom: 18px; }
+        label { display: block; margin-bottom: 6px; color: #555; font-weight: 600; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+        
+        /* Deposit Info Box */
+        .deposit-card { background: #eef6ff; border-left: 4px solid #0066cc; padding: 12px; margin-bottom: 20px; border-radius: 4px; }
+        .deposit-card p { margin: 0; font-size: 13px; color: #004085; }
+
+        button { width: 100%; background: #0066cc; color: #fff; border: none; padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #0052a3; }
+        button:disabled { background: #cccccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Book Appointment</h1>
+
+    <div id="alertBanner" class="alert"></div>
+
+    <form id="bookingForm">
+        <div class="form-group">
+            <label for="customerName">Full Name</label>
+            <input type="text" id="customerName" required placeholder="Customer Name">
+        </div>
+
+        <div class="form-group">
+            <label for="stylistId">Select Stylist</label>
+            <select id="stylistId" required>
+                <option value="">-- Choose a Stylist --</option>
+                <option value="stylist-101">Alex (Haircuts & Styling)</option>
+                <option value="stylist-102">Sam (Coloring Specialist)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="bookingDate">Date</label>
+            <input type="date" id="bookingDate" required>
+        </div>
+
+        <div class="form-group">
+            <label for="timeSlot">Available Time Slots</label>
+            <select id="timeSlot" required>
+                <option value="">-- Select Time Slot --</option>
+                <option value="09:00">09:00 AM</option>
+                <option value="11:00">11:00 AM</option>
+                <option value="14:00">02:00 PM</option>
+                <option value="16:00">04:00 PM</option>
+            </select>
+        </div>
+
+        <div class="deposit-card">
+            <strong>Deposit Required: $25.00</strong>
+            <p>A non-refundable deposit is required to hold your slot. Final payment will be settled in-salon.</p>
+        </div>
+
+        <div class="form-group">
+            <label for="cardNumber">Card Details</label>
+            <input type="text" id="cardNumber" placeholder="4242 •••• •••• 4242" required maxlength="19">
+        </div>
+
+        <button type="submit" id="submitBtn">Pay Deposit & Confirm Booking</button>
+    </form>
+</div>
+
+<script>
+    const API_URL = "https://uauz9shdph.execute-api.us-east-1.amazonaws.com/prod/book";
+
+    const form = document.getElementById('bookingForm');
+    const alertBanner = document.getElementById('alertBanner');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // Helper to display top alerts
+    function showAlert(message, isSuccess) {
+        alertBanner.textContent = message;
+        alertBanner.className = `alert ${isSuccess ? 'alert-success' : 'alert-error'}`;
+        alertBanner.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        // Clear past status and disable button during request
+        alertBanner.style.display = 'none';
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Processing...";
+
+        const payload = {
+            customer_name: document.getElementById('customerName').value,
+            stylist_id: document.getElementById('stylistId').value,
+            date: document.getElementById('bookingDate').value,
+            time_slot: document.getElementById('timeSlot').value,
+            deposit_paid: 25.00
+        };
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showAlert(`Success: ${result.message || 'Deposit processed and booking queued successfully!'}`, true);
+                form.reset();
+            } else {
+                showAlert(`Booking Failed: ${result.error || 'Unable to process appointment.'}`, false);
+            }
+        } catch (error) {
+            showAlert("Network Error: Unable to communicate with the booking server.", false);
+            console.error("Submission error:", error);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Pay Deposit & Confirm Booking";
+        }
+    });
+</script>
+
+</body>
+</html>

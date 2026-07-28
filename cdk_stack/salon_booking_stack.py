@@ -5,10 +5,10 @@ from aws_cdk import (
     aws_ec2 as ec2,
     aws_s3 as s3,
     aws_dynamodb as dynamodb,
+    aws_apigateway as apigateway,
     aws_sqs as sqs,
     aws_lambda as _lambda,
     aws_lambda_event_sources as lambda_events,
-    aws_apigateway as apigw,  # Using stable REST API Gateway
 )
 from constructs import Construct
 
@@ -109,16 +109,20 @@ class SalonBookingStack(Stack):
         table.grant_write_data(worker_lambda)
 
         # 8. Stable REST API Gateway Endpoint
-        api = apigw.LambdaRestApi(
-            self, "SalonApi",
-            handler=booking_lambda,
-            proxy=False,
-            default_cors_preflight_options=apigw.CorsOptions(
-                allow_origins=apigw.Cors.ALL_ORIGINS,
-                allow_methods=apigw.Cors.ALL_METHODS
+        api = apigateway.RestApi(
+            self, "SalonBookingApi",
+            default_cors_preflight_options=apigateway.CorsOptions(
+                allow_origins=apigateway.Cors.ALL_ORIGINS,
+                allow_methods=["POST", "OPTIONS"],
+                allow_headers=["Content-Type", "X-Amz-Date", "Authorization", "X-Api-Key", "X-Amz-Security-Token"]
             )
-        )
+       ) 
 
         # POST /book Route
         book_resource = api.root.add_resource("book")
-        book_resource.add_method("POST")
+        book_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(booking_lambda) # type: ignore[arg-type]
+        )
+
+        
