@@ -38,6 +38,8 @@ jobs:
           npm install -g aws-cdk
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install stripe -t ./lambda/booking
+          pip install stripe -t ./lambda/worker
 
       - name: Deploy CDK Stack
         env:
