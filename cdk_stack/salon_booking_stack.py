@@ -1,3 +1,4 @@
+import os
 from aws_cdk import (
     Stack,
     Duration,
@@ -10,7 +11,6 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_lambda_event_sources as lambda_events,
     CfnOutput,
-    os
 )
 from constructs import Construct
 
