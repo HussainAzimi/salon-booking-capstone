@@ -42,13 +42,14 @@ jobs:
       - name: Deploy CDK Stack
         run: |
           cdk synth
-          cdk deploy --require-approval never
+          cdk deploy --require-approval never --outputs-file outputs.json
 
       - name: Deploy Frontend to S3
         run: |
-          BUCKET_NAME=$(cat outputs.json | grep -o '"SalonFrontendBucketName": "[^"]*"' | cut -d'"' -f4)
-          if [ -n "$BUCKET_NAME" ]; then
-            BUCKET_NAME=$(cat outputs.json | grep -o '"[a-zA-Z0-9]*SalonFrontendBucket[a-zA-Z0-9]*": "[^"]*"' | cut -d'"' -f4)
+          BUCKET_NAME=$(aws s3api list-buckets --query "Buckets[?contains(Name, 'salonfrontendbucket')].Name" --output text | head -n 1)
+
+          if [ -z "$BUCKET_NAME" ] && [ -f outputs.json ]; then
+            BUCKET_NAME=$(grep -o '"SalonFrontendBucketName": "[^"]*"' outputs.json | cut -d'"' -f4)   
           fi
           echo "Target Bucket: $BUCKET_NAME"
           
@@ -57,6 +58,6 @@ jobs:
              aws s3 sync ./frontend s3://$BUCKET_NAME/ --delete
              echo "Successfully deployed frontend to s3://$BUCKET_NAME/"
           else
-            echo "S3 Bucket output not found in outputs.json. Skipping frontend sync."
+            echo "ERROR: Could not locate frontend S3 bucket"
             exit 1
           fi
