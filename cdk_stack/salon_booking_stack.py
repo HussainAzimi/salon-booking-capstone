@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_sqs as sqs,
     aws_lambda as _lambda,
     aws_lambda_event_sources as lambda_events,
+    CfnOutput
 )
 from constructs import Construct
 
@@ -75,6 +76,7 @@ class SalonBookingStack(Stack):
                 restrict_public_buckets=False
             ),
             removal_policy=RemovalPolicy.DESTROY
+            auto_dlete_objects=True
         )
 
         # 6. Booking Lambda Function (Private Subnet)
@@ -125,4 +127,21 @@ class SalonBookingStack(Stack):
             apigateway.LambdaIntegration(booking_lambda) # type: ignore[arg-type]
         )
 
-        
+        # 9. Stack Outputs (CRITICAL for GitHub Actions & Frontend)
+        CfnOutput(
+            self, "SalonFrontendBucketName",
+            value=frontend_bucket.bucket_name,
+            description="Frontend S3 Bucket Name for GitHub Actions deployment"
+        )
+
+        CfnOutput(
+            self, "SalonFrontendWebsiteUrl",
+            value=frontend_bucket.bucket_website_url,
+            description="URL for the hosted Frontend Website"
+        )
+
+        CfnOutput(
+            self, "SalonBookingApiUrl",
+            value=api.url,
+            description="Base URL for REST API Gateway"
+        )
