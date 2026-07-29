@@ -182,7 +182,7 @@ class SalonBookingStack(Stack):
         )
 
         http_api = apigwv2.HttpApi(
-            self, "SalonBookingApi",
+            self, "SalonBookingApiV2",
             cors_preflight=apigwv2.CorsPreflightOptions(
                 allow_origins=["*"] if FRONTEND_ORIGIN == "*" else [FRONTEND_ORIGIN],
                 allow_methods=[
