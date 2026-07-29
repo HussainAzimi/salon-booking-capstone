@@ -12,7 +12,7 @@ logger.setLevel(logging.INFO)
 
 # Fetch environment variables
 STRIPE_SECRET_ARN = os.environ.get("STRIPE_SECRET_ARN")
-FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "*")  # Default to '*' if not set
+FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN") or "*"  # Default to '*' if not set
 QUEUE_URL = os.environ.get('QUEUE_URL')
 DEPOSIT_AMOUNT_CENTS = int(os.environ.get("DEPOSIT_AMOUNT_CENTS", "1000"))
 
