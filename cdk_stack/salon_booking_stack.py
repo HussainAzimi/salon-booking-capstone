@@ -23,7 +23,7 @@ class SalonBookingStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         AUTH0_DOMAIN = self.node.try_get_context("auth0_domain") or os.environ.get(
-            "AUTH0_DOMAIN", "YOUR_TENANT.us.auth0.com"
+            "AUTH0_DOMAIN", "dev-bycoupho2ffes63s.us.auth0.com"
         )
         AUTH0_AUDIENCE = self.node.try_get_context("auth0_audience") or os.environ.get(
             "AUTH0_AUDIENCE", "https://salon-booking-api"
