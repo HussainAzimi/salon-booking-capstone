@@ -43,6 +43,12 @@ jobs:
         run: |
           if [ -d tests ]; then pytest; else echo "No tests directory found, skipping"; fi
 
+      - name: Get AWS account ID
+        id: aws_account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> "$GITHUB_OUTPUT"
+
       - name: CDK bootstrap (safe to run every time — no-ops if already bootstrapped)
         run: npx aws-cdk@2 bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ env.AWS_REGION }}
 
