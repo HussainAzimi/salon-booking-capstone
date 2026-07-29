@@ -28,6 +28,10 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -39,11 +43,12 @@ jobs:
         run: |
           if [ -d tests ]; then pytest; else echo "No tests directory found, skipping"; fi
 
-
+      - name: CDK bootstrap (safe to run every time — no-ops if already bootstrapped)
+        run: npx aws-cdk@2 bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ env.AWS_REGION }}
 
       - name: CDK deploy
         run: |
-          cdk deploy --all --require-approval never \
+          npx aws-cdk@2 deploy --all --require-approval never \
             -c auth0_domain="${{ secrets.AUTH0_DOMAIN }}" \
             -c auth0_audience="${{ secrets.AUTH0_AUDIENCE }}"
         env:
