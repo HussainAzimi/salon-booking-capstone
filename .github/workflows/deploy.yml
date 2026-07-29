@@ -1,17 +1,19 @@
-name: Deploy CDK Stack to AWS
+name: Deploy Salon Booking system to AWS
 
 on:
   push:
     branches: [main]
+  workflow_dispatch: {}
 
-env:
-  AWS_REGION: us-east-1
-
+permissions:
+  id-token: write 
+  contents: read  
 jobs:
   deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
-
+    env:
+      AWS_REGION: us-east-1
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,35 +35,29 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install dependencies
+      - name: Run unit tests
         run: |
-          npm install -g aws-cdk
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install stripe -t ./lambda/booking
-          pip install stripe -t ./lambda/worker
+          if [ -d tests ]; then pytest; else echo "No tests directory found, skipping"; fi
 
-      - name: Deploy CDK Stack
+
+
+      - name: CDK deploy
+        run: |
+          cdk deploy --all --require-approval never \
+            -c auth0_domain="${{ secrets.AUTH0_DOMAIN }}" \
+            -c auth0_audience="${{ secrets.AUTH0_AUDIENCE }}"
         env:
-          STRIPE_API_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          FRONTEND_ORIGIN: ${{ secrets.FRONTEND_ORIGIN }}
+ 
+      - name: Get frontend bucket name from stack outputs
+        id: stack_outputs
         run: |
-          cdk synth
-          cdk deploy --require-approval never --outputs-file outputs.json
-
-      - name: Deploy Frontend to S3
+          BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name SalonBookingStack \
+            --query "Stacks[0].Outputs[?OutputKey=='SalonFrontendBucketName'].OutputValue" \
+            --output text)
+          echo "bucket=$BUCKET" >> "$GITHUB_OUTPUT"
+ 
+      - name: Sync frontend to S3
         run: |
-          BUCKET_NAME=$(aws s3api list-buckets --query "Buckets[?contains(Name, 'salonfrontendbucket')].Name" --output text | head -n 1)
-
-          if [ -z "$BUCKET_NAME" ] && [ -f outputs.json ]; then
-            BUCKET_NAME=$(grep -o '"SalonFrontendBucketName": "[^"]*"' outputs.json | cut -d'"' -f4)   
-          fi
-          echo "Target Bucket: $BUCKET_NAME"
-          
-          if [ -n "$BUCKET_NAME" ]; then
-           
-             aws s3 sync ./frontend s3://$BUCKET_NAME/ --delete
-             echo "Successfully deployed frontend to s3://$BUCKET_NAME/"
-          else
-            echo "ERROR: Could not locate frontend S3 bucket"
-            exit 1
-          fi
+          aws s3 sync ./frontend s3://${{ steps.stack_outputs.outputs.bucket }} --delete

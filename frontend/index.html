@@ -7,25 +7,31 @@
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #f4f6f9; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .container { background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
-        h1 { margin-top: 0; color: #333; text-align: center; }
-        
-        /* Banner Styles */
+        .container { background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); width: 100%; max-width: 520px; }
+        h1 { margin: 0 0 18px; color: #333; text-align: center; }
+
         .alert { padding: 15px; margin-bottom: 20px; border-radius: 6px; display: none; text-align: center; font-weight: bold; }
         .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .alert-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        
+
+        .auth-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+        .auth-bar button { width: auto; padding: 8px 14px; font-size: 13px; }
+
         .form-group { margin-bottom: 18px; }
         label { display: block; margin-bottom: 6px; color: #555; font-weight: 600; }
         input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
-        
-        /* Deposit Info Box */
+
+        #card-element { padding: 10px; border: 1px solid #ccc; border-radius: 6px; background: #fff; }
+
         .deposit-card { background: #eef6ff; border-left: 4px solid #0066cc; padding: 12px; margin-bottom: 20px; border-radius: 4px; }
         .deposit-card p { margin: 0; font-size: 13px; color: #004085; }
 
         button { width: 100%; background: #0066cc; color: #fff; border: none; padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
         button:hover { background: #0052a3; }
         button:disabled { background: #cccccc; cursor: not-allowed; }
+        .small { font-size: 12px; color: #666; margin-top: 6px; }
+        fieldset { border: none; padding: 0; margin: 0; }
+        fieldset:disabled { opacity: 0.6; }
     </style>
 </head>
 <body>
@@ -33,108 +39,281 @@
 <div class="container">
     <h1>Book Appointment</h1>
 
-    <div id="alertBanner" class="alert"></div>
+    <div class="auth-bar">
+        <span id="authStatus" class="small">Checking login status…</span>
+        <button id="authBtn" type="button">Log in</button>
+    </div>
+
+    <div id="alertBanner" class="alert" role="status" aria-live="polite"></div>
 
     <form id="bookingForm">
-        <div class="form-group">
-            <label for="customerName">Full Name</label>
-            <input type="text" id="customerName" required placeholder="Customer Name">
-        </div>
+        <fieldset id="formFieldset" disabled>
+            <div class="form-group">
+                <label for="customerName">Full Name</label>
+                <input type="text" id="customerName" required placeholder="Customer Name">
+            </div>
 
-        <div class="form-group">
-            <label for="stylistId">Select Stylist</label>
-            <select id="stylistId" required>
-                <option value="">-- Choose a Stylist --</option>
-                <option value="stylist-101">Alex (Haircuts & Styling)</option>
-                <option value="stylist-102">Sam (Coloring Specialist)</option>
-            </select>
-        </div>
+            <div class="form-group">
+                <label for="stylistId">Select Stylist</label>
+                <select id="stylistId" required>
+                    <option value="">-- Choose a Stylist --</option>
+                    <option value="stylist-101">Alex (Haircuts & Styling)</option>
+                    <option value="stylist-102">Sam (Coloring Specialist)</option>
+                </select>
+            </div>
 
-        <div class="form-group">
-            <label for="bookingDate">Date</label>
-            <input type="date" id="bookingDate" required>
-        </div>
+            <div class="form-group">
+                <label for="bookingDate">Date</label>
+                <input type="date" id="bookingDate" required>
+            </div>
 
-        <div class="form-group">
-            <label for="timeSlot">Available Time Slots</label>
-            <select id="timeSlot" required>
-                <option value="">-- Select Time Slot --</option>
-                <option value="09:00">09:00 AM</option>
-                <option value="11:00">11:00 AM</option>
-                <option value="14:00">02:00 PM</option>
-                <option value="16:00">04:00 PM</option>
-            </select>
-        </div>
+            <div class="form-group">
+                <label for="timeSlot">Available Time Slots</label>
+                <select id="timeSlot" required>
+                    <option value="">-- Choose stylist and date first --</option>
+                </select>
+                <div class="small" id="availabilityStatus"></div>
+            </div>
 
-        <div class="deposit-card">
-            <strong>Deposit Required: $10.00</strong>
-            <p>A non-refundable deposit is required to hold your slot. Final payment will be settled in-salon.</p>
-        </div>
+            <div class="deposit-card">
+                <strong>Deposit Required: $10.00</strong>
+                <p>A deposit is required to hold your slot. It is only charged once your booking is confirmed —
+                   if someone else books the same slot first, the hold is automatically released.</p>
+            </div>
 
-        <div class="form-group">
-            <label for="cardNumber">Card Details</label>
-            <input type="text" id="cardNumber" placeholder="Card Number" required maxlength="19">
-        </div>
+            <div class="form-group">
+                <label for="card-element">Card Details</label>
+                <div id="card-element"></div>
+            </div>
 
-        <button type="submit" id="submitBtn">Pay Deposit & Confirm Booking</button>
+            <button type="submit" id="submitBtn">Pay Deposit &amp; Confirm Booking</button>
+        </fieldset>
     </form>
 </div>
 
+<script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
+<script src="https://js.stripe.com/v3/"></script>
 <script>
-    const API_URL = "https://uauz9shdph.execute-api.us-east-1.amazonaws.com/prod/book";
+    // ---- Configuration — replace with your actual values ----
+    const API_BASE_URL = "https://uauz9shdph.execute-api.us-east-1.amazonaws.com"; // HttpApi $default stage: no /prod suffix
+    const STRIPE_PUBLISHABLE_KEY = "pk_test_51Tu3EHRzghb31V6ncCv7z31i8iTL2yXyCbl3cPwfuWiIR9yiee1hF68D72jiHmvkj751EUboLMW2mt1MS8hQyMlg00CujlA6iD";
+    const AUTH0_DOMAIN = "dev-bycoupho2ffes63s.us.auth0.com";
+    const AUTH0_CLIENT_ID = "cYQXUdtnwlRhdVLZ1nNqbyqifa3TFUsG";
+    const AUTH0_AUDIENCE = "https://salon-booking-api";
 
-    const form = document.getElementById('bookingForm');
-    const alertBanner = document.getElementById('alertBanner');
-    const submitBtn = document.getElementById('submitBtn');
+    const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+    const elements = stripe.elements();
+    const card = elements.create("card");
+    card.mount("#card-element");
 
-    // Helper to display top alerts
-    function showAlert(message, isSuccess) {
+    const form = document.getElementById("bookingForm");
+    const formFieldset = document.getElementById("formFieldset");
+    const alertBanner = document.getElementById("alertBanner");
+    const submitBtn = document.getElementById("submitBtn");
+    const authBtn = document.getElementById("authBtn");
+    const authStatus = document.getElementById("authStatus");
+    const stylistSelect = document.getElementById("stylistId");
+    const dateInput = document.getElementById("bookingDate");
+    const timeSlotSelect = document.getElementById("timeSlot");
+    const availabilityStatus = document.getElementById("availabilityStatus");
+
+    let auth0Client = null;
+
+    function showAlert(message, isSuccess = true) {
         alertBanner.textContent = message;
-        alertBanner.className = `alert ${isSuccess ? 'alert-success' : 'alert-error'}`;
-        alertBanner.style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        alertBanner.className = `alert ${isSuccess ? "alert-success" : "alert-error"}`;
+        alertBanner.style.display = "block";
+        window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        // Clear past status and disable button during request
-        alertBanner.style.display = 'none';
-        submitBtn.disabled = true;
-        submitBtn.textContent = "Processing...";
+    function clearAlert() {
+        alertBanner.style.display = "none";
+        alertBanner.textContent = "";
+    }
 
-        const payload = {
-            customer_name: document.getElementById('customerName').value,
-            stylist_id: document.getElementById('stylistId').value,
-            date: document.getElementById('bookingDate').value,
-            time_slot: document.getElementById('timeSlot').value,
-            deposit_paid: 25.00
-        };
+    async function postJson(url, body, token) {
+        const resp = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(body),
+        });
+        const data = await resp.json().catch(() => ({}));
+        return { status: resp.status, data };
+    }
+
+    async function getJson(url, token) {
+        const resp = await fetch(url, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await resp.json().catch(() => ({}));
+        return { status: resp.status, data };
+    }
+
+    // ---- Auth0 setup ----
+    async function initAuth() {
+        auth0Client = await auth0.createAuth0Client({
+            domain: AUTH0_DOMAIN,
+            clientId: AUTH0_CLIENT_ID,
+            authorizationParams: {
+                redirect_uri: window.location.origin,
+                audience: AUTH0_AUDIENCE,
+            },
+        });
+
+        const query = window.location.search;
+        if (query.includes("code=") && query.includes("state=")) {
+            await auth0Client.handleRedirectCallback();
+            window.history.replaceState({}, document.title, "/");
+        }
+
+        await refreshAuthUI();
+    }
+
+    async function refreshAuthUI() {
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        if (isAuthenticated) {
+            const user = await auth0Client.getUser();
+            authStatus.textContent = `Logged in as ${user.email || user.name}`;
+            authBtn.textContent = "Log out";
+            formFieldset.disabled = false;
+            loadAvailability();
+        } else {
+            authStatus.textContent = "Please log in to book an appointment.";
+            authBtn.textContent = "Log in";
+            formFieldset.disabled = true;
+        }
+    }
+
+    authBtn.addEventListener("click", async () => {
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        if (isAuthenticated) {
+            await auth0Client.logout({ logoutParams: { returnTo: window.location.origin } });
+        } else {
+            await auth0Client.loginWithRedirect();
+        }
+    });
+
+    // ---- Availability ----
+    async function loadAvailability() {
+        const stylist_id = stylistSelect.value;
+        const date = dateInput.value;
+        timeSlotSelect.innerHTML = `<option value="">-- Choose stylist and date first --</option>`;
+        availabilityStatus.textContent = "";
+
+        if (!stylist_id || !date) return;
+
+        availabilityStatus.textContent = "Loading available times…";
+        try {
+            const token = await auth0Client.getTokenSilently();
+            const { status, data } = await getJson(
+                `${API_BASE_URL}/availability?stylist_id=${encodeURIComponent(stylist_id)}&date=${encodeURIComponent(date)}`,
+                token
+            );
+            if (status !== 200) {
+                availabilityStatus.textContent = "Could not load availability. Try again.";
+                return;
+            }
+            const slots = data.available_slots || [];
+            if (slots.length === 0) {
+                timeSlotSelect.innerHTML = `<option value="">No slots available this day</option>`;
+            } else {
+                timeSlotSelect.innerHTML =
+                    `<option value="">-- Select Time Slot --</option>` +
+                    slots.map((s) => `<option value="${s}">${s}</option>`).join("");
+            }
+            availabilityStatus.textContent = "";
+        } catch (err) {
+            console.error(err);
+            availabilityStatus.textContent = "Could not load availability. Try again.";
+        }
+    }
+
+    stylistSelect.addEventListener("change", loadAvailability);
+    dateInput.addEventListener("change", loadAvailability);
+
+    // ---- Booking submission ----
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearAlert();
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Processing…";
+
+        const customer_name = document.getElementById("customerName").value.trim();
+        const stylist_id = stylistSelect.value;
+        const date = dateInput.value;
+        const time_slot = timeSlotSelect.value;
+
+        if (!customer_name || !stylist_id || !date || !time_slot) {
+            showAlert("Please complete all required fields.", false);
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Pay Deposit & Confirm Booking";
+            return;
+        }
 
         try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+            const token = await auth0Client.getTokenSilently();
+
+            const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
+                type: "card",
+                card: card,
+                billing_details: { name: customer_name },
             });
 
-            const result = await response.json();
-
-            if (response.ok) {
-                showAlert(`Success: ${result.message || 'Deposit processed and booking queued successfully!'}`, true);
-                form.reset();
-            } else {
-                showAlert(`Booking Failed: ${result.error || 'Unable to process appointment.'}`, false);
+            if (pmError) {
+                showAlert(pmError.message || "Failed to create payment method.", false);
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Pay Deposit & Confirm Booking";
+                return;
             }
-        } catch (error) {
-            showAlert("Network Error: Unable to communicate with the booking server.", false);
-            console.error("Submission error:", error);
+
+            const payload = {
+                customer_name,
+                stylist_id,
+                date,
+                time_slot,
+                payment_method_id: paymentMethod.id,
+                client_request_id: `${stylist_id}-${date}-${time_slot}-${Date.now()}`,
+            };
+
+            // Note: no trailing "/book" duplication — API_BASE_URL is the API root.
+            const resp = await postJson(`${API_BASE_URL}/book`, payload, token);
+
+            if (resp.status === 200 && resp.data && resp.data.client_secret) {
+                const clientSecret = resp.data.client_secret;
+                const { error: confirmError } = await stripe.confirmCardPayment(clientSecret);
+                if (confirmError) {
+                    showAlert(confirmError.message || "Payment confirmation failed.", false);
+                } else {
+                    showAlert("Payment confirmed. Booking request queued — check your email shortly.", true);
+                    form.reset();
+                    card.clear();
+                    loadAvailability();
+                }
+            } else if (resp.status === 202) {
+                showAlert(resp.data?.message || "Booking request queued. Check your email for confirmation.", true);
+                form.reset();
+                card.clear();
+                loadAvailability();
+            } else if (resp.status === 401) {
+                showAlert("Your session expired. Please log in again.", false);
+            } else if (resp.status === 402) {
+                showAlert(resp.data?.error || "Payment required or failed.", false);
+            } else {
+                showAlert(resp.data?.error || "Unexpected error. Please try again.", false);
+            }
+        } catch (err) {
+            console.error("Submission error:", err);
+            showAlert("Network error: unable to reach the booking server.", false);
         } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = "Pay Deposit & Confirm Booking";
         }
     });
-</script>
 
+    initAuth();
+</script>
 </body>
 </html>
