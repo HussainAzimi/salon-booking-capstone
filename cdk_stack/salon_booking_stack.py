@@ -28,7 +28,7 @@ class SalonBookingStack(Stack):
         AUTH0_AUDIENCE = self.node.try_get_context("auth0_audience") or os.environ.get(
             "AUTH0_AUDIENCE", "https://salon-booking-api"
         )
-        FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "*")
+        FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN" or "*")
         DEPOSIT_AMOUNT_CENTS = "1000"  # $10.00 
         # 1. VPC Setup (2 Availability Zones, Public + Private Subnets)
         vpc = ec2.Vpc(
