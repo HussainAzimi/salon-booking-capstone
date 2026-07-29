@@ -66,3 +66,13 @@ jobs:
       - name: Sync frontend to S3
         run: |
           aws s3 sync ./frontend s3://${{ steps.stack_outputs.outputs.bucket }} --delete
+
+      - name: Get CloudFront distribution ID and invalidate cache
+        run: |
+          DIST_ID=$(aws cloudformation describe-stacks \
+            --stack-name SalonBookingStack \
+            --query "Stacks[0].Outputs[?OutputKey=='SalonFrontendDistributionId'].OutputValue" \
+            --output text)
+          if [ -n "$DIST_ID" ] && [ "$DIST_ID" != "None" ]; then
+            aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
+          fi

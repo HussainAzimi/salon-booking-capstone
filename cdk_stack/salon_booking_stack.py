@@ -14,6 +14,8 @@ from aws_cdk import (
     aws_lambda_event_sources as lambda_events,
     aws_secretsmanager as secretsmanager,
     aws_logs as logs,
+    aws_cloudfront as cloudfront,
+    aws_cloudfront_origins as origins,
     CfnOutput,
 )
 from constructs import Construct
@@ -109,7 +111,27 @@ class SalonBookingStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True
         )
-        
+
+        # 5b. CloudFront distribution in front of the S3 website endpoint.
+        #     S3 static website hosting only ever serves plain HTTP — it cannot serve
+        #     HTTPS directly, even with a public bucket. Auth0's SPA SDK refuses to run
+        #     at all on an insecure origin, and Stripe.js requires HTTPS outside test
+        #     mode, so the site must be served through something that terminates TLS.
+        #     CloudFront's default *.cloudfront.net domain comes with a valid HTTPS
+        #     certificate out of the box — no ACM certificate or custom domain needed.
+
+        frontend_distribution = cloudfront.Distribution(
+            self, "SalonFrontendDistribution",
+            default_behavior=cloudfront.BehaviorOptions(
+                origin=origins.HttpOrigin(
+                    frontend_bucket.bucket_website_domain_name,
+                    protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+                ),
+                viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            ),
+            default_root_object="index.html",
+        )
+
         # 6. Stripe secret in AWS Secrets Manager
         stripe_secret = secretsmanager.Secret.from_secret_name_v2(
             self, "StripesSecret",
@@ -212,7 +234,11 @@ class SalonBookingStack(Stack):
         CfnOutput(self, "SalonFrontendBucketName", value=frontend_bucket.bucket_name,
                   description="Frontend S3 bucket name for GitHub Actions deployment")
         CfnOutput(self, "SalonFrontendWebsiteUrl", value=frontend_bucket.bucket_website_url,
-                  description="URL for the hosted frontend website")
+                  description="Raw S3 website URL — HTTP only, will NOT work with Auth0/Stripe. Use the CloudFront URL below instead.")
+        CfnOutput(self, "SalonFrontendHttpsUrl", value=f"https://{frontend_distribution.distribution_domain_name}",
+                  description="HTTPS URL to actually use/share — required by Auth0 and Stripe.js")
+        CfnOutput(self, "SalonFrontendDistributionId", value=frontend_distribution.distribution_id,
+                  description="CloudFront distribution ID, used by CI to invalidate the cache after deploys")
         CfnOutput(self, "SalonBookingApiUrl", value=http_api.api_endpoint,
                   description="Base URL for the HTTP API (routes: POST /book, GET /availability)")
         CfnOutput(self, "AppointmentsTableName", value=table.table_name, description="DynamoDB table name")
