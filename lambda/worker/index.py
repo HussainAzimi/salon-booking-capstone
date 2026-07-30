@@ -29,6 +29,7 @@ def _get_stripe_key():
         return _stripe_key_cache
     if not STRIPE_SECRET_ARN:
         raise RuntimeError("STRIPE_SECRET_ARN not configured")
+    
         resp = secrets.get_secret_value(SecretId=STRIPE_SECRET_ARN)
         secret = resp.get("SecretString")
         if not secret:
