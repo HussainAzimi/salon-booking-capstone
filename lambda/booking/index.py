@@ -6,7 +6,6 @@ import boto3
 import stripe
 from botocore.exceptions import ClientError
 
-
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
