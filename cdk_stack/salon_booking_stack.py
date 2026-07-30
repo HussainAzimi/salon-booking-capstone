@@ -11,6 +11,7 @@ from aws_cdk import (
     aws_apigatewayv2_authorizers as authorizers,
     aws_sqs as sqs,
     aws_lambda as _lambda,
+    aws_lambda_python_alpha as python_lambda,
     aws_lambda_event_sources as lambda_events,
     aws_secretsmanager as secretsmanager,
     aws_logs as logs,
@@ -139,20 +140,28 @@ class SalonBookingStack(Stack):
         )
 
         # 7. Booking Lambda Function (Private Subnet)
-        booking_lambda = _lambda.Function(
-            self, "BookingLambda",
+        booking_lambda = python_lambda.PythonFunction(
+            self,
+            "BookingLambda",
+
             runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="index.handler",
-            code=_lambda.Code.from_asset("lambda/booking"),
+
+            entry="lambda/booking",
+            index="index.py",
+            handler="handler",
+
             timeout=Duration.seconds(20),
             memory_size=512,
+
             tracing=_lambda.Tracing.ACTIVE,
+
             log_retention=logs.RetentionDays.ONE_WEEK,
+
             environment={
                 "QUEUE_URL": booking_queue.queue_url,
                 "STRIPE_SECRET_ARN": stripe_secret.secret_arn,
-                "FRONTEND_ORIGIN": os.environ.get("FRONTEND_ORIGIN", "*"),
-                "DEPOSIT_AMOUNT_CENTS": DEPOSIT_AMOUNT_CENTS,   
+                "FRONTEND_ORIGIN": FRONTEND_ORIGIN,
+                "DEPOSIT_AMOUNT_CENTS": DEPOSIT_AMOUNT_CENTS,
             },
         )
         booking_queue.grant_send_messages(booking_lambda)
@@ -175,11 +184,12 @@ class SalonBookingStack(Stack):
         table.grant_read_data(availability_lambda)
 
         # 9. Worker Lambda — runs in the private subnet, does the conditional write + refund logic.
-        worker_lambda = _lambda.Function(
+        worker_lambda = python_lambda.PythonFunction(
             self, "WorkerLambda",
             runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="index.handler",
-            code=_lambda.Code.from_asset("lambda/worker"),
+            entry="lambda/worker",
+            index="index.py",
+            handler="handler",
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             timeout=Duration.seconds(30),
