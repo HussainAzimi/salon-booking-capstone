@@ -25,17 +25,30 @@ _stripe_key_cache = None
 
 def _get_stripe_key():
     global _stripe_key_cache
+
     if _stripe_key_cache:
         return _stripe_key_cache
+
     if not STRIPE_SECRET_ARN:
         raise RuntimeError("STRIPE_SECRET_ARN not configured")
-    
-        resp = secrets.get_secret_value(SecretId=STRIPE_SECRET_ARN)
-        secret = resp.get("SecretString")
-        if not secret:
-            raise RuntimeError("Secrets Manager returned empty secret")
-        _stripe_key_cache = secret.strip()
-        return _stripe_key_cache
+
+    resp = secrets.get_secret_value(
+        SecretId=STRIPE_SECRET_ARN
+    )
+
+    secret = resp.get("SecretString")
+
+    if not secret:
+        raise RuntimeError("Secrets Manager returned an empty secret")
+
+    _stripe_key_cache = secret.strip()
+
+    logger.info(
+        "Stripe key loaded successfully. Prefix: %s",
+        _stripe_key_cache[:7]
+    )
+
+    return _stripe_key_cache
 
 def _with_retries(fn, *, label, payment_intent_id):
     last_exc = None

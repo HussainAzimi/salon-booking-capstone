@@ -111,7 +111,7 @@ def handler(event, context):
             "statusCode": 500,
             "headers": headers,
             "body": json.dumps({
-                "error": str(e)
+            "error": str(e)
             })
         }
 
@@ -128,7 +128,7 @@ def handler(event, context):
             "statusCode": 401,
             "headers": headers,
             "body": json.dumps({
-                "error": "Unauthorized"
+            "error": "Unauthorized"
             })
         }
 
