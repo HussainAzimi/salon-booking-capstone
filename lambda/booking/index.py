@@ -226,17 +226,25 @@ def handler(event, context):
                 amount=DEPOSIT_AMOUNT_CENTS,
                 currency="usd",
                 automatic_payment_methods={
-                    "enabled": True
+                    "enabled": True,
+                    "allow_redirects": "never"
                 },
                 description=f"Salon Booking - {customer_name}",
                 idempotency_key=idempotency_key,
             )
 
+            logger.info(
+            "PaymentIntent created for frontend confirmation. ID: %s",
+            intent.id
+           )
+
             return {
                 "statusCode": 200,
                 "headers": headers,
                 "body": json.dumps({
-                    "client_secret": intent.client_secret
+                "client_secret": intent.client_secret,
+                "payment_intent_id": intent.id,
+                "message": "Confirm payment on client side"
                 })
             }
 
