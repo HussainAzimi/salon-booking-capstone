@@ -41,7 +41,9 @@ def _get_stripe_key():
     if not secret:
         raise RuntimeError("Secrets Manager returned an empty secret")
 
-    _stripe_key_cache = secret.strip()
+    
+    secret_json = json.loads(secret)
+    _stripe_key_cache = secret_json["STRIPE_SECRET_KEY"].strip()
 
     logger.info(
         "Stripe key loaded successfully. Prefix: %s",

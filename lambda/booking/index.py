@@ -50,8 +50,10 @@ def get_stripe_key():
 
     if not secret:
         raise RuntimeError("Stripe secret not found")
-
-    _stripe_key_cache = secret.strip()
+    
+    secret_json = json.loads(secret)
+    _stripe_key_cache = secret_json["STRIPE_SECRET_KEY"].strip()
+    
 
     return _stripe_key_cache
 
