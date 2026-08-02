@@ -33,7 +33,7 @@ jobs:
 
       - name: Install Lambda dependencies into asset folders
       # Code.from_asset() just zips whatever's already in these folders
-       run: |
+        run: |
           pip install -r lambda/booking/requirements.txt -t lambda/booking --upgrade
           pip install -r lambda/worker/requirements.txt -t lambda/worker --upgrade
           pip install -r lambda/availability/requirements.txt -t lambda/availability --upgrade
