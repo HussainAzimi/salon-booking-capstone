@@ -1,1 +1,1 @@
-stripestripe==11.1.0
+stripe==11.1.0
