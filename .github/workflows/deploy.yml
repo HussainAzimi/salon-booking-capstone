@@ -36,7 +36,6 @@ jobs:
         run: |
           pip install -r lambda/booking/requirements.txt -t lambda/booking --upgrade
           pip install -r lambda/worker/requirements.txt -t lambda/worker --upgrade
-          pip install -r lambda/availability/requirements.txt -t lambda/availability --upgrade
           pip install -r lambda/status/requirements.txt -t lambda/status --upgrade
 
 
