@@ -5,6 +5,7 @@ from aws_cdk import (
     RemovalPolicy,
     aws_ec2 as ec2,
     aws_s3 as s3,
+    aws_s3_deployment as s3deploy,
     aws_dynamodb as dynamodb,
     aws_apigatewayv2 as apigwv2,
     aws_apigatewayv2_integrations as integrations,
@@ -132,6 +133,18 @@ class SalonBookingStack(Stack):
             default_root_object="index.html",
         )
 
+        # 5c. Automatically upload local static assets & invalidate CloudFront cache.
+        s3deploy.BucketDeployment(
+            self, "DeployFrontendAssets",
+            sources=[s3deploy.Source.asset("./frontend")],
+            destination_bucket=frontend_bucket,
+            distribution=frontend_distribution,
+            distribution_paths=["/*"],
+            cache_control=[
+                s3deploy.CacheControl.from_string("max-age=0, no-cache, no-store, must-revalidate")
+            ]
+        )
+
         # 6. Stripe secret in AWS Secrets Manager
         stripe_secret = secretsmanager.Secret.from_secret_name_v2(
             self, "StripesSecret",
@@ -139,6 +152,10 @@ class SalonBookingStack(Stack):
         )
 
         # 7. Booking Lambda Function (Private Subnet)
+        booking_log_group = logs.LogGroup(
+            self, "BookingLambdaLogs", retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY
+        )
         booking_lambda =_lambda.Function(
             self,
             "BookingLambda",
@@ -149,7 +166,7 @@ class SalonBookingStack(Stack):
             timeout=Duration.seconds(20),
             memory_size=512,
             tracing=_lambda.Tracing.ACTIVE,
-            log_retention=logs.RetentionDays.ONE_WEEK,
+            log_group=booking_log_group,
             environment={
                 "QUEUE_URL": booking_queue.queue_url,
                 "STRIPE_SECRET_ARN": stripe_secret.secret_arn,
@@ -161,6 +178,10 @@ class SalonBookingStack(Stack):
         stripe_secret.grant_read(booking_lambda)
 
         # 8. Availability Lambda — read-only query so the frontend can show real open slots.
+        availability_log_group = logs.LogGroup(
+            self, "AvailabilityLambdaLogs", retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY
+        )
         availability_lambda = _lambda.Function(
             self, "AvailabilityLambda",
             runtime=_lambda.Runtime.PYTHON_3_11,
@@ -168,7 +189,7 @@ class SalonBookingStack(Stack):
             code=_lambda.Code.from_asset("lambda/availability"),
             timeout=Duration.seconds(10),
             memory_size=256,
-            log_retention=logs.RetentionDays.ONE_WEEK,
+            log_group=availability_log_group,
             environment={
                 "TABLE_NAME": table.table_name,
                 "FRONTEND_ORIGIN": FRONTEND_ORIGIN,
@@ -176,7 +197,31 @@ class SalonBookingStack(Stack):
         )
         table.grant_read_data(availability_lambda)
 
+        # 8b. Status Lambda — lets the frontend poll for the real outcome after the
+        #     async Worker Lambda has resolved a duplicate-booking race. The booking
+        #     Lambda's 202 response only means "queued", not "confirmed" — this is
+        #     what tells the frontend whether it actually won or lost the race.
+        status_lambda = _lambda.Function(
+            self, "StatusLambda",
+            runtime=_lambda.Runtime.PYTHON_3_11,
+            handler="index.handler",
+            code=_lambda.Code.from_asset("lambda/status"),
+            timeout=Duration.seconds(10),
+            memory_size=256,
+            log_retention=logs.RetentionDays.ONE_WEEK,
+            environment={
+                "STRIPE_SECRET_ARN": stripe_secret.secret_arn,
+                "FRONTEND_ORIGIN": FRONTEND_ORIGIN,
+            },
+        )
+        stripe_secret.grant_read(status_lambda)
+ 
+
         # 9. Worker Lambda — runs in the private subnet, does the conditional write + refund logic.
+        worker_log_group = logs.LogGroup(
+            self, "WorkerLambdaLogs", retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY
+        )
         worker_lambda = _lambda.Function(
             self, "WorkerLambda",
             runtime=_lambda.Runtime.PYTHON_3_11,
@@ -187,7 +232,7 @@ class SalonBookingStack(Stack):
             timeout=Duration.seconds(30),
             memory_size=512,
             tracing=_lambda.Tracing.ACTIVE,
-            log_retention=logs.RetentionDays.ONE_WEEK,
+            log_group=worker_log_group,
             environment={
                 "TABLE_NAME": table.table_name,
                 "STRIPE_SECRET_ARN": stripe_secret.secret_arn,
@@ -221,14 +266,21 @@ class SalonBookingStack(Stack):
         http_api.add_routes(
             path="/book",
             methods=[apigwv2.HttpMethod.POST],
-            integration=integrations.HttpLambdaIntegration("BookingIntegration", booking_lambda),
+            integration=integrations.HttpLambdaIntegration("BookingIntegration", booking_lambda), # type: ignore
             authorizer=jwt_authorizer,
         )
 
         http_api.add_routes(
             path="/availability",
             methods=[apigwv2.HttpMethod.GET],
-            integration=integrations.HttpLambdaIntegration("AvailabilityIntegration", availability_lambda),
+            integration=integrations.HttpLambdaIntegration("AvailabilityIntegration", availability_lambda), # type: ignore
+            authorizer=jwt_authorizer,
+        )
+
+        http_api.add_routes(
+            path="/status",
+            methods=[apigwv2.HttpMethod.GET],
+            integration=integrations.HttpLambdaIntegration("StatusIntegration", status_lambda), # type: ignore
             authorizer=jwt_authorizer,
         )
 

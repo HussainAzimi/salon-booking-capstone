@@ -31,6 +31,14 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      - name: Install Lambda dependencies into asset folders
+      # Code.from_asset() just zips whatever's already in these folders
+       run: |
+          pip install -r lambda/booking/requirements.txt -t lambda/booking --upgrade
+          pip install -r lambda/worker/requirements.txt -t lambda/worker --upgrade
+          pip install -r lambda/availability/requirements.txt -t lambda/availability --upgrade
+          pip install -r lambda/status/requirements.txt -t lambda/status --upgrade
+
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

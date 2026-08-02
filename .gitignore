@@ -20,3 +20,39 @@ outputs.json
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Python packages bundled into Lambda
+lambda/booking/stripe/
+lambda/booking/*.dist-info/
+lambda/booking/requests/
+lambda/booking/urllib3/
+lambda/booking/certifi/
+lambda/booking/idna/
+lambda/booking/charset_normalizer/
+
+lambda/worker/stripe/
+lambda/worker/*.dist-info/
+lambda/worker/requests/
+lambda/worker/urllib3/
+lambda/worker/certifi/
+lambda/worker/idna/
+lambda/worker/charset_normalizer/
+lambda/booking/bin/
+lambda/worker/bin/
+
+
+lambda/status/stripe/
+lambda/status/*.dist-info/
+lambda/status/requests/
+lambda/status/urllib3/
+lambda/status/certifi/
+lambda/status/idna/
+lambda/status/charset_normalizer/
+lambda/status/bin/
+lambda/status/bin/
+
+
+# Bundled Lambda dependencies (local only)
+lambda/booking/typing_extensions.py
+lambda/worker/typing_extensions.py
+lambda/status/typing_extensions.py

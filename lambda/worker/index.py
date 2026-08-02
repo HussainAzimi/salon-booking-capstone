@@ -7,6 +7,7 @@ import boto3
 import stripe
 from botocore.exceptions import ClientError
 from decimal import Decimal
+from datetime import datetime, timezone
 
 
 logger = logging.getLogger()
@@ -51,6 +52,7 @@ def _get_stripe_key():
     )
 
     return _stripe_key_cache
+
 
 def _with_retries(fn, *, label, payment_intent_id):
     last_exc = None
@@ -99,9 +101,11 @@ def handler(event, context):
         customer_name = body.get('customer_name')
         user_id = body.get("user_id")
         stylist_id = body.get('stylist_id')
+        stylist_name = body.get("stylist_name")
         date = body.get('date')
         time_slot = body.get('time_slot')
         payment_intent_id = body.get('payment_intent_id')
+        booking_reference = body.get("booking_reference") or record_id[:8].upper()
         deposit_amount_cents = body.get("deposit_amount_cents")
         
 
@@ -110,19 +114,27 @@ def handler(event, context):
         except (TypeError, ValueError):
             logger.error("Invalid deposit_amount_cents; raising to trigger retry/DLQ", extra={"record_id": record_id, "value": deposit_amount_cents})
             raise
+        # Create a booking reference that customers can use when contacting the salon.
+        # booking_reference = body.get("booking_reference") or record_id[:8].upper()
+
         # Primary Key format: STYLIST#<ID>#<DATE>#<TIME>
         primary_key = f"STYLIST#{stylist_id}#{date}#{time_slot}"
         item = {
             "PK": primary_key,
-            "SK": f"BOOKING#{uuid.uuid4()}",
+            "SK": "BOOKING", # MUST stay static — do not randomize, or duplicate-booking prevention breaks silently.
             "UserId": user_id,
             "CustomerName": customer_name,
             "StylistID": stylist_id,
+            "StylistName": stylist_name,
             "Date": date,
             "TimeSlot": time_slot,
             "DepositAmountCents": Decimal(deposit_amount_cents),
             "PaymentIntentId": payment_intent_id,
             "PaymentStatus": "CONFIRMED",
+            "BookingReference": booking_reference,
+            "CreatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "CreatedAtEpoch": int(time.time()),  # kept as a number for sorting/filtering if ever needed.
+            # GSI so a user can list their own bookings later.
             "GSI1PK": f"USER#{user_id}",
             "GSI1SK": f"{date}#{time_slot}",
         }
@@ -137,12 +149,15 @@ def handler(event, context):
                 try:
                     _capture_payment(payment_intent_id)
                 except Exception:
-                    logger.exception("Payment capture failed; raising to trigger retry/DLQ", extra={"record_id": record_id, "payment_intent_id": payment_intent_id},)
-                    raise
+                    logger.exception("Payment capture failed; raising to trigger retry/DLQ", extra={"record_id": record_id, "payment_intent_id": payment_intent_id},
+                    )
+                    
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code")
             if error_code == "ConditionalCheckFailedException":
-                logger.warning("Duplicate booking detected; initiating refund", extra={"record_id": record_id, "payment_intent_id": payment_intent_id},)
+                logger.warning("Duplicate booking detected; initiating refund", extra={"record_id": record_id, "payment_intent_id": payment_intent_id},
+                )
+                
                 if payment_intent_id:
                     try:
                         _cancel_payment(payment_intent_id)

@@ -37,7 +37,7 @@
 <body>
 
 <div class="container">
-    <h1>Book Appointment</h1>
+    <h1>Book Your Appointment</h1>
 
     <div class="auth-bar">
         <span id="authStatus" class="small">Checking login status…</span>
@@ -116,11 +116,26 @@
     const dateInput = document.getElementById("bookingDate");
     const timeSlotSelect = document.getElementById("timeSlot");
     const availabilityStatus = document.getElementById("availabilityStatus");
+    
+    // Block past dates in the date picker — computed client-side so it's always "today"
+    // regardless of when the page was last deployed/cached.
+    (function setBookingDates() {
+        
+
+    const today = new Date();
+    // const yyyy = today.getFullYear();
+    // const mm = String(today.getMonth() + 1).padStart(2, "0");
+    // const dd = String(today.getDate()).padStart(2, "0");
+
+    dateInput.min = today.toISOString().split("T")[0];
+    // dateInput.removeAttribute("max");
+
+    })();
 
     let auth0Client = null;
 
     function showAlert(message, isSuccess = true) {
-        alertBanner.textContent = message;
+        alertBanner.innerHTML = `<pre style="margin:0;white-space:pre-wrap;font-family:inherit;">${message}</pre>`;
         alertBanner.className = `alert ${isSuccess ? "alert-success" : "alert-error"}`;
         alertBanner.style.display = "block";
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -128,7 +143,7 @@
 
     function clearAlert() {
         alertBanner.style.display = "none";
-        alertBanner.textContent = "";
+        alertBanner.innerHTML = "";
     }
 
     async function postJson(url, body, token) {
@@ -168,6 +183,8 @@
             await auth0Client.handleRedirectCallback();
             window.history.replaceState({}, document.title, "/");
         }
+        
+        loadAvailability();
 
         await refreshAuthUI();
     }
@@ -197,42 +214,117 @@
     });
 
     // ---- Availability ----
-    async function loadAvailability() {
+    // ------------------------------------------------------------
+    // Load available appointment times
+    // Prevent duplicate bookings by disabling the submit button
+    // until the latest availability has been loaded.
+    // ------------------------------------------------------------
+        async function loadAvailability() {
+
         const stylist_id = stylistSelect.value;
         const date = dateInput.value;
-        timeSlotSelect.innerHTML = `<option value="">-- Choose stylist and date first --</option>`;
+
+        timeSlotSelect.innerHTML =
+            `<option value="">-- Choose stylist and date first --</option>`;
+
         availabilityStatus.textContent = "";
 
-        if (!stylist_id || !date) return;
+        // Disable booking while checking availability
+        submitBtn.disabled = true;
 
-        availabilityStatus.textContent = "Loading available times…";
+        if (!stylist_id || !date) {
+
+            submitBtn.disabled = false;
+            return;
+
+        }
+
+        availabilityStatus.textContent =
+            "Checking available appointment times...";
+
         try {
+
             const token = await auth0Client.getTokenSilently();
+
             const { status, data } = await getJson(
+
                 `${API_BASE_URL}/availability?stylist_id=${encodeURIComponent(stylist_id)}&date=${encodeURIComponent(date)}`,
+
                 token
+
             );
+
             if (status !== 200) {
-                availabilityStatus.textContent = "Could not load availability. Try again.";
+
+                availabilityStatus.textContent =
+                    "Could not load availability. Try again.";
+
                 return;
+
             }
+
             const slots = data.available_slots || [];
+
             if (slots.length === 0) {
-                timeSlotSelect.innerHTML = `<option value="">No slots available this day</option>`;
+
+                timeSlotSelect.innerHTML =
+                    `<option value="">No appointments available this day</option>`;
+
             } else {
+
                 timeSlotSelect.innerHTML =
                     `<option value="">-- Select Time Slot --</option>` +
-                    slots.map((s) => `<option value="${s}">${s}</option>`).join("");
-            }
-            availabilityStatus.textContent = "";
-        } catch (err) {
-            console.error(err);
-            availabilityStatus.textContent = "Could not load availability. Try again.";
-        }
-    }
+                    slots.map(slot =>
+                        `<option value="${slot}">${slot}</option>`
+                    ).join("");
 
+            }
+
+            availabilityStatus.textContent = "";
+
+        }
+
+        catch (err) {
+
+            console.error(err);
+
+            availabilityStatus.textContent =
+                "Could not load availability. Try again.";
+
+        }
+
+        finally {
+
+            // Always re-enable the button once loading finishes
+            submitBtn.disabled = false;
+
+        }
+
+    }
     stylistSelect.addEventListener("change", loadAvailability);
     dateInput.addEventListener("change", loadAvailability);
+    
+     // ---- Poll /status after a 202, since "queued" isn't the final answer —
+    // the Worker Lambda resolves duplicate-slot races asynchronously. Poll a
+    // few times with a short delay rather than trusting the 202 at face value.
+       async function pollBookingStatus(paymentIntentId, token, { attempts = 8, delayMs = 1500 } = {}) {
+        for (let i = 0; i < attempts; i++) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            try {
+                const { status, data } = await getJson(
+                    `${API_BASE_URL}/status?payment_intent_id=${encodeURIComponent(paymentIntentId)}`,
+                    token
+                );
+                if (status === 200 && data.booking_status && data.booking_status !== "pending") {
+                    return data.booking_status; // "confirmed" or "duplicate_slot_taken"
+                }
+            } catch (err) {
+                console.error("Status poll failed:", err);
+                // keep retrying — a single failed poll shouldn't abort the whole flow
+            }
+        }
+        return "timeout"; // gave up waiting; still genuinely unresolved
+    }
 
     // ---- Booking submission ----
     form.addEventListener("submit", async (e) => {
@@ -269,9 +361,11 @@
                 return;
             }
 
+            const stylist_name = stylistSelect.options[stylistSelect.selectedIndex].text.split("(")[0].trim();
             const payload = {
                 customer_name,
                 stylist_id,
+                stylist_name,
                 date,
                 time_slot,
                 payment_method_id: paymentMethod.id,
@@ -286,17 +380,53 @@
                 const { error: confirmError } = await stripe.confirmCardPayment(clientSecret);
                 if (confirmError) {
                     showAlert(confirmError.message || "Payment confirmation failed.", false);
-                } else {
-                    showAlert("Payment confirmed. Booking request queued — check your email shortly.", true);
+                    submitBtnq.disabled = false;
+                    submitBtn.textContent = "Pay Deposit & Confirm Booking";
+                    return;
+
+                }
+                // fall through to polling below using the same payment_intent_id
+                resp.data.payment_intent_id = resp.data.payment_intent_id || clientSecret.split("_secret")[0];
+
+            }
+            if (resp.status === 200 || resp.status === 202) {
+                const paymentIntentId = resp.data.payment_intent_id;
+                const [year, month, day] = date.split("-").map(Number);
+                const formattedDate = new Date(year, month - 1, day).toLocaleDateString("en-US", {
+                    weekday: "long", year: "numeric", month: "long", day: "numeric",
+                });
+ 
+                showAlert(
+                    `⏳ Confirming your booking…\n\n${stylist_name} — ${formattedDate} at ${time_slot}\n\nPlease wait a moment while we finalize your slot.`,
+                    true, /* isSuccess */ true /* pending */
+                );
+ 
+                const outcome = paymentIntentId
+                    ? await pollBookingStatus(paymentIntentId, token)
+                    : "timeout";
+ 
+                if (outcome === "confirmed") {
+                    const bookingRef = resp.data.booking_reference || payload.client_request_id;
+                    showAlert(
+                        `🎉 Booking Confirmed!\n\nThank you, ${customer_name}.\n\n👤 Stylist: ${stylist_name}\n📅 Date: ${formattedDate}\n🕘 Time: ${time_slot}\n📖 Reference: ${bookingRef}\n\nYour $10 deposit has been charged. We look forward to seeing you!`,
+                        true
+                    );
                     form.reset();
                     card.clear();
                     loadAvailability();
+                } else if (outcome === "duplicate_slot_taken") {
+                    showAlert(
+                        `😔 Sorry — that time slot was just booked by someone else moments before you.\n\nYour $10 deposit hold has been released; you will not be charged.\n\nPlease pick another available time.`,
+                        false
+                    );
+                    loadAvailability();
+                } else {
+                    // timeout — genuinely unresolved after polling; be honest about it
+                    showAlert(
+                        `Your booking request was received and is still being processed. This is taking longer than usual — please check back in a minute, or contact the salon with reference ${resp.data.booking_reference || payload.client_request_id} if you don't hear back.`,
+                        true
+                    );
                 }
-            } else if (resp.status === 202) {
-                showAlert(resp.data?.message || "Booking request queued. Check your email for confirmation.", true);
-                form.reset();
-                card.clear();
-                loadAvailability();
             } else if (resp.status === 401) {
                 showAlert("Your session expired. Please log in again.", false);
             } else if (resp.status === 402) {
@@ -312,8 +442,8 @@
             submitBtn.textContent = "Pay Deposit & Confirm Booking";
         }
     });
-
-    initAuth();
+ 
+    initAuth();         
 </script>
 </body>
 </html>

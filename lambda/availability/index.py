@@ -2,6 +2,7 @@ import json
 import os
 import logging
 import boto3
+from datetime import datetime, timedelta
 from boto3.dynamodb.conditions import Key
 
 logger = logging.getLogger()
@@ -10,8 +11,21 @@ logger.setLevel(logging.INFO)
 TABLE_NAME = os.environ.get("TABLE_NAME")
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "*")
 
-# All slots the salon offers in a day — booked ones get filtered out below.
-ALL_SLOTS = ["09:00", "11:00", "14:00", "16:00"]
+# Generate 30-minute appointment slots instead of using hardcoded times.
+def generate_time_slots():
+    slots = []
+
+    current = datetime.strptime("09:00", "%H:%M")
+    end = datetime.strptime("17:00", "%H:%M")
+
+    while current < end:
+        slots.append(current.strftime("%I:%M %p"))
+        current += timedelta(minutes=30)
+
+    return slots
+
+# Build all available appointment slots automatically.
+ALL_SLOTS = generate_time_slots()
 
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
@@ -38,6 +52,12 @@ def handler(event, context):
             "body": json.dumps({"error": "stylist_id and date query parameters are required"}),
         }
 
+    logger.info(
+        "Checking availability for stylist=%s date=%s",
+        stylist_id,
+        date
+    )
+
     # PK format is STYLIST#<ID>#<DATE>#<TIME>, so a begins_with query on the shared
     # STYLIST#<ID>#<DATE># prefix returns every slot already booked that day.
     prefix = f"STYLIST#{stylist_id}#{date}#"
@@ -47,11 +67,22 @@ def handler(event, context):
             ExpressionAttributeValues={":prefix": prefix},
         )
         booked_slots = {item["TimeSlot"] for item in resp.get("Items", [])}
+
+        logger.info(
+            "Booked slots: %s",
+            list(booked_slots)
+        )
+
     except Exception:
         logger.exception("Failed to read availability", extra={"stylist_id": stylist_id, "date": date})
         return {"statusCode": 500, "headers": cors_headers, "body": json.dumps({"error": "Internal server error"})}
 
     available = [slot for slot in ALL_SLOTS if slot not in booked_slots]
+
+    logger.info(
+       "Available slots returned: %s",
+        available
+    )
 
     return {
         "statusCode": 200,
